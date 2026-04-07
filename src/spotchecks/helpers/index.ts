@@ -49,7 +49,7 @@ export const getUserAgent = async (): Promise<string> => {
 
 export const getAllSpotcheckFunctions = async (domainName: string) => {
   try {
-    const response = await axios.get(`https://${domainName}/api/internal/spotcheck/mobile/init`);
+    const response = await axios.get(`https://${domainName}/api/internal/spotcheck/mobile/init?framework=expo`);
     
     const { componentSchemas, ...functions } = response.data;
     

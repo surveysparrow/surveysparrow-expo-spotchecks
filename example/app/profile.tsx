@@ -37,9 +37,10 @@ const ProfileScreen: React.FC = () => {
         <View style={styles.content}>
           <TouchableOpacity
             onPress={async () => {
-              await trackEvent('ProfileScreen', {
-                test: {},
-              });
+              // await trackEvent('ProfileScreen', {
+              //   test: {},
+              // });
+              router.navigate("settings" as any)
             }}
             style={{ backgroundColor: '#f0f0f0', paddingHorizontal: 10 }}>
             <Text style={styles.link}>Track Event</Text>

@@ -36,6 +36,7 @@ interface SchemaNode {
   if?: any;
   slot?: string;
   component?: string;
+  meta?: { componentRole?: string; [key: string]: unknown };
   content?: any;
   animation?: {
     enter?: AnimationConfig;
@@ -100,6 +101,42 @@ interface BuilderContext {
 interface BuilderProps {
   schema: SchemaNode | SchemaNode[] | null;
   context: BuilderContext;
+}
+
+/** Expands touch area to backend `closeButtonMinimumTapTarget` vs `closeButtonContainerStyle` (RN `hitSlop`). */
+function computeCloseButtonHitSlop(styles: Record<string, any> | undefined): {
+  top: number;
+  left: number;
+  bottom: number;
+  right: number;
+} | undefined {
+  if (!styles) return undefined;
+  const tap = styles.closeButtonMinimumTapTarget as { minWidth?: number; minHeight?: number } | undefined;
+  const container = styles.closeButtonContainerStyle as { width?: number; height?: number } | undefined;
+  if (!tap || !container) return undefined;
+  const minW = Number(tap.minWidth) || 44;
+  const minH = Number(tap.minHeight) || 44;
+  const w = Number(container.width) || 0;
+  const h = Number(container.height) || 0;
+  if (w <= 0 || h <= 0) return undefined;
+  const dh = Math.max(0, (minW - w) / 2);
+  const dv = Math.max(0, (minH - h) / 2);
+  return { top: dv, bottom: dv, left: dh, right: dh };
+}
+
+function mergeCloseButtonTouchTargetProps(
+  node: SchemaNode,
+  context: BuilderContext,
+  resolvedProps: Record<string, any>
+): Record<string, any> {
+  if (node.meta?.componentRole !== 'closeButton') {
+    return resolvedProps;
+  }
+  const hitSlop = computeCloseButtonHitSlop(context.styles);
+  if (!hitSlop) {
+    return resolvedProps;
+  }
+  return { ...resolvedProps, hitSlop };
 }
 
 componentRegistry.register('View', View);
@@ -522,7 +559,8 @@ const renderNode = (node: SchemaNode, context: BuilderContext, key: string): Rea
     return null;
   }
 
-  const resolvedProps = node.props ? resolveBinding(node.props, context) : {};
+  let resolvedProps: Record<string, any> = node.props ? resolveBinding(node.props, context) : {};
+  resolvedProps = mergeCloseButtonTouchTargetProps(node, context, resolvedProps);
 
   const hasContentProperty = (node as any).content !== undefined;
   const content = hasContentProperty ? resolveBinding((node as any).content, context) : null;

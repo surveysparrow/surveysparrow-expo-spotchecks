@@ -5,7 +5,7 @@ import { Wrapper } from "./components/Wrapper";
 import { getAllSpotcheckFunctions, getUserAgent } from "./helpers";
 import { CustomProperties, SpotcheckProps, UserDetails, Variables } from "./helpers/types";
 import { spotcheckStore, updateState } from "./state/spotcheckState";
-import { execute, setListener } from "./helpers/executables";
+import { execute, flushPendingExecutes, setListener } from "./helpers/executables";
 import { SpotCheckButton } from "./components/SpotCheckButton";
 import { useSpotcheckNavigation } from "./helpers/NavigationHandler";
 import { initializeSentry, captureP0Error } from "./helpers/sentry";
@@ -90,7 +90,8 @@ export const initializeSpotChecks = async (params: SpotcheckProps) => {
   // Init: fetch functions and initialize (has its own Sentry)
   try {
     await getAllSpotcheckFunctions(params.domainName);
-    execute("initializeSpotcheckComponent", params);
+    await execute("initializeSpotcheckComponent", params);
+    await flushPendingExecutes();
   } catch (error: any) {
     console.error("Error initializing spotchecks:", error);
     throw error;

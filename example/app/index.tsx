@@ -1,5 +1,5 @@
 import { useRouter } from "expo-router";
-import { useLayoutEffect } from "react";
+import { useEffect } from "react";
 import {
   StyleSheet,
   Text,
@@ -12,40 +12,33 @@ import {
   trackScreen,
   trackEvent,
 } from "surveysparrow-expo-spotchecks";
-import type {
-  SsSpotcheckListener,
-  UserDetails,
-  Variables,
-  CustomProperties,
-} from "surveysparrow-expo-spotchecks";
 
-const listener: SsSpotcheckListener = {
-  onSurveyLoaded: async (response: Record<string, any>) => {
-    console.log('Survey Loaded', response);
-  },
-  onSurveyResponse: async (response: Record<string, any>) => {
-    console.log('Survey Response', response);
-  },
-  onPartialSubmission: async (response: Record<string, any>) => {
-    console.log('Partial Submission', response);
-  },
-  onCloseButtonTap: async () => {
-    console.log('Close Button Tapped');
-  },
-};
+
+
 
 export default function Index() {
   const router = useRouter();
 
-  useLayoutEffect(() => {
-    initializeSpotChecks({
-      domainName: "your-domain.com",
-      targetToken: "your-target-token",
-      userDetails: {
-        email: "your-email@example.com"
-      },
-      listener,
-    });
+
+  useEffect(() => {
+    const variables = {
+      sparrowLang: 'en',
+      'test-variable': '****test-VALUE****',
+    };
+    const customProperties = {};
+    const userDetails = {
+      email: 'gokul@gmail.com',
+    };
+
+
+    setTimeout(() => {
+    trackScreen('ProfileScreen', {
+      variables,
+        customProperties,
+        userDetails,
+      });
+
+    }, 0);
   }, []);
 
   return (

@@ -42,6 +42,27 @@ export const dispatchWrapper = (stateUpdate: any) => {
   }
 };
 
+type PendingCall = { functionName: string; params?: any };
+
+const pendingExecutes: PendingCall[] = [];
+
+function isTrackScreenOrEvent(functionName: string): boolean {
+  return functionName === "trackScreen" || functionName === "trackEvent";
+}
+
+/**
+ * Run trackScreen / trackEvent calls that were queued before mobile/init finished loading bundles.
+ * Call once after initializeSpotcheckComponent has completed (full SDK init).
+ */
+export const flushPendingExecutes = async () => {
+  while (pendingExecutes.length > 0) {
+    const item = pendingExecutes.shift();
+    if (item) {
+      await execute(item.functionName, item.params);
+    }
+  }
+};
+
 export const execute = async (functionName: string, params?: any) => {
   let func: any;
   let payload: any;
@@ -51,6 +72,9 @@ export const execute = async (functionName: string, params?: any) => {
     const functionState = functionStore.getState();
 
     if (!functionState.functionState.isLoaded) {
+      if (isTrackScreenOrEvent(functionName)) {
+        pendingExecutes.push({ functionName, params });
+      }
       return null;
     }
 

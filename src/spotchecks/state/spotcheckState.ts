@@ -26,6 +26,7 @@ const initialState: any = {
     variables: {},
     customProperties: {},
     visitor: getVisitorInfo(),
+    framework: 'expo',
     userAgent: '',
     traceId: '',
   },

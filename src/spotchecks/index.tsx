@@ -3,12 +3,27 @@ import { Provider } from "react-redux";
 import WebViewComponent from "./components/WebViewComponent";
 import { Wrapper } from "./components/Wrapper";
 import { getAllSpotcheckFunctions, getUserAgent } from "./helpers";
-import { CustomProperties, SpotcheckProps, UserDetails, Variables } from "./helpers/types";
+import {
+  SpotcheckProps,
+  TrackEventProps,
+  TrackScreenOptions,
+  TrackScreenProps,
+} from "./helpers/types";
 import { spotcheckStore, updateState } from "./state/spotcheckState";
 import { execute, flushPendingExecutes, setListener } from "./helpers/executables";
 import { SpotCheckButton } from "./components/SpotCheckButton";
 import { useSpotcheckNavigation } from "./helpers/NavigationHandler";
 import { initializeSentry, captureP0Error } from "./helpers/sentry";
+
+function resolveTrackOptions(input?: TrackScreenOptions): Required<
+  Pick<TrackScreenOptions, "variables" | "customProperties" | "userDetails">
+> {
+  return {
+    variables: input?.variables ?? {},
+    customProperties: input?.customProperties ?? {},
+    userDetails: input?.userDetails ?? {},
+  };
+}
 
 export const SDK_VERSION = '1.0.4-beta.1';
 
@@ -98,53 +113,74 @@ export const initializeSpotChecks = async (params: SpotcheckProps) => {
   }
 };
 
-export const trackScreen = async (
+export async function trackScreen(
   screen: string,
-  options: {
-    variables?: Variables;
-    customProperties?: CustomProperties;
-    userDetails?: UserDetails;
-  } = {
-    variables: {},
-    customProperties: {},
-    userDetails: {},
-  }
-) => {
+  options?: TrackScreenOptions
+): Promise<void>;
+export async function trackScreen(props: TrackScreenProps): Promise<void>;
+export async function trackScreen(
+  screenOrProps: string | TrackScreenProps,
+  optionsArg?: TrackScreenOptions
+): Promise<void> {
+  const screen =
+    typeof screenOrProps === "string" ? screenOrProps : screenOrProps.screen;
+  const options = resolveTrackOptions(
+    typeof screenOrProps === "string"
+      ? optionsArg
+      : screenOrProps.options
+  );
   try {
     execute("trackScreen", { screen, options });
   } catch (error: any) {
     console.error("Error tracking screen:", error);
     throw error;
   }
-};
+}
 
-export const trackEvent = async (
+export async function trackEvent(
   screen: string,
-  event: {
-    [key: string]: any;
-  } = {}
-) => {
+  event: Record<string, any>,
+  options?: TrackScreenOptions
+): Promise<void>;
+export async function trackEvent(props: TrackEventProps): Promise<void>;
+export async function trackEvent(
+  screenOrProps: string | TrackEventProps,
+  eventArg?: Record<string, any>,
+  optionsArg?: TrackScreenOptions
+): Promise<void> {
+  let screen: string;
+  let event: Record<string, any>;
+  let options: ReturnType<typeof resolveTrackOptions>;
+  if (typeof screenOrProps === "string") {
+    screen = screenOrProps;
+    if (eventArg === undefined) {
+      throw new Error("trackEvent: `event` is required");
+    }
+    event = eventArg;
+    options = resolveTrackOptions(optionsArg);
+  } else {
+    screen = screenOrProps.screen;
+    if (screenOrProps.event == null) {
+      throw new Error("trackEvent: `event` is required");
+    }
+    event = screenOrProps.event;
+    options = resolveTrackOptions(screenOrProps.options);
+  }
   try {
-    execute("trackEvent", { screen, event });
+    execute("trackEvent", { screen, event, options });
   } catch (error: any) {
     console.error("Error tracking event:", error);
     throw error;
   }
-};
+}
 
-export const onSpotcheckNavigationChange = () => {
-  try {
-    execute("handleNavigationChange");
-  } catch (error: any) {
-    console.error("Error handling navigation change:", error);
-  }
-};
 
 export type {
+  CustomProperties,
   SpotcheckProps,
   SsSpotcheckListener,
   TrackEventProps,
+  TrackScreenProps,
   UserDetails,
   Variables,
-  CustomProperties,
 } from "./helpers/types";

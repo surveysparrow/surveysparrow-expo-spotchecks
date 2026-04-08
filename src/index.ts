@@ -1,17 +1,19 @@
-export {
+import {
   SpotCheck,
   initializeSpotChecks,
   trackScreen,
   trackEvent,
-  onSpotcheckNavigationChange,
-} from './spotchecks';
+} from "./spotchecks";
+
+export { initializeSpotChecks, trackScreen, trackEvent };
+export default SpotCheck;
 
 export type {
+  CustomProperties,
   SpotcheckProps,
   SsSpotcheckListener,
   TrackEventProps,
+  TrackScreenProps,
   UserDetails,
   Variables,
-  CustomProperties,
-} from './spotchecks';
-
+} from "./spotchecks";

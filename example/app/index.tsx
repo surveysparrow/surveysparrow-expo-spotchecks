@@ -7,11 +7,8 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import {
-  initializeSpotChecks,
-  trackScreen,
-  trackEvent,
-} from "surveysparrow-expo-spotchecks";
+import { trackScreen } from "surveysparrow-expo-spotchecks";
+import type { Variables, CustomProperties, UserDetails } from "surveysparrow-expo-spotchecks";
 
 
 
@@ -21,24 +18,21 @@ export default function Index() {
 
 
   useEffect(() => {
-    const variables = {
+    const variables: Variables = {
       sparrowLang: 'en',
       'test-variable': '****test-VALUE****',
     };
-    const customProperties = {};
-    const userDetails = {
+    const customProperties: CustomProperties = {};
+
+    const userDetails: UserDetails = {
       email: 'gokul@gmail.com',
     };
 
-
-    setTimeout(() => {
-    trackScreen('ProfileScreen', {
+    trackScreen('HomeScreen', {
       variables,
-        customProperties,
-        userDetails,
-      });
-
-    }, 0);
+      customProperties,
+      userDetails,
+    });
   }, []);
 
   return (

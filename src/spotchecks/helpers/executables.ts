@@ -7,7 +7,6 @@ import { captureP0Error, captureP1Error } from "./sentry";
 import { Adjuster } from "./Adjuster";
 import { SDK_VERSION } from "../index";
 
-// Save the host app's keyboard mode, then set ADJUST_NOTHING
 const pauseDefaultKeyboardBehavior = () => {
   if (Platform.OS === 'android') {
     try {
@@ -50,10 +49,6 @@ function isTrackScreenOrEvent(functionName: string): boolean {
   return functionName === "trackScreen" || functionName === "trackEvent";
 }
 
-/**
- * Run trackScreen / trackEvent calls that were queued before mobile/init finished loading bundles.
- * Call once after initializeSpotcheckComponent has completed (full SDK init).
- */
 export const flushPendingExecutes = async () => {
   while (pendingExecutes.length > 0) {
     const item = pendingExecutes.shift();
@@ -67,7 +62,6 @@ export const execute = async (functionName: string, params?: any) => {
   let func: any;
   let payload: any;
 
-  // Infrastructure: resolve function and build payload
   try {
     const functionState = functionStore.getState();
 
@@ -110,11 +104,16 @@ export const execute = async (functionName: string, params?: any) => {
     return null;
   }
 
-  // Execution: run the backend function (has its own Sentry + console.error)
   try {
     const result = await func(payload);
     return result;
   } catch (error: any) {
+    captureP1Error(error, "GENERAL", {
+      action: "execute:runtime",
+      functionName,
+      errorMessage: error?.message,
+    });
+    console.error(`[execute] ${functionName}:`, error);
     return null;
   }
 }

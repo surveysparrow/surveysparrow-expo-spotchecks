@@ -1,11 +1,9 @@
 import { Stack } from "expo-router";
 import { useLayoutEffect } from "react";
 import { SafeAreaProvider } from "react-native-safe-area-context";
-import { initializeSpotChecks, SpotCheck } from "surveysparrow-expo-spotchecks";
-import type {
-  SsSpotcheckListener,
-
-} from "surveysparrow-expo-spotchecks";
+import { initializeSpotChecks } from "surveysparrow-expo-spotchecks";
+import SpotCheck from "surveysparrow-expo-spotchecks";
+import type { SsSpotcheckListener } from "surveysparrow-expo-spotchecks";
 
 const listener: SsSpotcheckListener = {
   onSurveyLoaded: async (response: Record<string, any>) => {
@@ -24,8 +22,8 @@ const listener: SsSpotcheckListener = {
 export default function RootLayout() {
   useLayoutEffect(() => {
     initializeSpotChecks({
-      domainName: "kalai.in.ngrok.io",
-      targetToken: "tar-4TtoU3D5mmopzFFRtHdEx7",
+      domainName: "",
+      targetToken: "",
       userDetails: {
         email: "your-email@example.com"
       },

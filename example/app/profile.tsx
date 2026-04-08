@@ -6,16 +6,15 @@ import { trackEvent, trackScreen } from 'surveysparrow-expo-spotchecks';
 import type { Variables, CustomProperties, UserDetails } from 'surveysparrow-expo-spotchecks';
 
 const ProfileScreen: React.FC = () => {
+  const variables: Variables = {
+    sparrowLang: 'en',
+    'test-variable': '****test-VALUE****',
+  };
+  const customProperties: CustomProperties = {};
+  const userDetails: UserDetails = {
+    email: 'gokul@gmail.com',
+  };
   useEffect(() => {
-    const variables: Variables = {
-      sparrowLang: 'en',
-      'test-variable': '****test-VALUE****',
-    };
-    const customProperties: CustomProperties = {};
-    const userDetails: UserDetails = {
-      email: 'gokul@gmail.com',
-    };
-
     trackScreen('ProfileScreen', {
       variables,
       customProperties,
@@ -37,10 +36,7 @@ const ProfileScreen: React.FC = () => {
         <View style={styles.content}>
           <TouchableOpacity
             onPress={async () => {
-              // await trackEvent('ProfileScreen', {
-              //   test: {},
-              // });
-              router.navigate("settings" as any)
+              await trackEvent('ProfileScreen', { test: {} });
             }}
             style={{ backgroundColor: '#f0f0f0', paddingHorizontal: 10 }}>
             <Text style={styles.link}>Track Event</Text>

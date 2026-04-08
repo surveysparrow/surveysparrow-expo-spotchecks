@@ -3,12 +3,7 @@ import {
   View, 
   TouchableOpacity, 
   Text, 
-  ScrollView, 
   Image, 
-  FlatList,
-  TextInput,
-  ActivityIndicator,
-  Modal,
   Pressable,
   Animated,
   UIManager,
@@ -19,7 +14,6 @@ import { WebViewRenderer } from './WebViewRenderer';
 import { componentRegistry } from './ComponentRegistry';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { CloseButton } from './CloseButton';
-import { SpotCheckButton } from './SpotCheckButton';
 import { execute } from '../helpers/executables';
 import { captureP1Error } from '../helpers/sentry';
 
@@ -103,7 +97,6 @@ interface BuilderProps {
   context: BuilderContext;
 }
 
-/** Expands touch area to backend `closeButtonMinimumTapTarget` vs `closeButtonContainerStyle` (RN `hitSlop`). */
 function computeCloseButtonHitSlop(styles: Record<string, any> | undefined): {
   top: number;
   left: number;
@@ -142,16 +135,10 @@ function mergeCloseButtonTouchTargetProps(
 componentRegistry.register('View', View);
 componentRegistry.register('TouchableOpacity', TouchableOpacity);
 componentRegistry.register('Text', Text);
-componentRegistry.register('ScrollView', ScrollView);
 componentRegistry.register('Image', Image);
-componentRegistry.register('FlatList', FlatList);
-componentRegistry.register('TextInput', TextInput);
-componentRegistry.register('ActivityIndicator', ActivityIndicator);
-componentRegistry.register('Modal', Modal);
 componentRegistry.register('Pressable', Pressable);
 componentRegistry.register('SafeAreaView', SafeAreaView);
 componentRegistry.register('CloseButton', CloseButton);
-componentRegistry.register('SpotCheckButton', SpotCheckButton);
 componentRegistry.register('SvgXml', SvgXml);
 componentRegistry.register('WebViewRenderer', WebViewRenderer as any);
 

@@ -1,6 +1,6 @@
 import { useEffect, useState, useMemo } from "react";
 import { useSelector } from "react-redux";
-import { SpotcheckState } from "../state/spotcheckState";
+import type { SpotcheckState } from "../state/spotcheckState";
 import { componentStore } from "../state/componentState";
 import { Builder } from "./Builder";
 import { componentRegistry } from "./ComponentRegistry";
@@ -45,7 +45,8 @@ export const SpotCheckButton: React.FC = () => {
     },
   }), [state, styles]);
 
-  if (spotCheckButtonSchema && componentState.isLoaded) {
+  // Wait for styles so the button never renders unstyled for a frame.
+  if (spotCheckButtonSchema && componentState.isLoaded && Object.keys(styles).length > 0) {
     return <Builder schema={spotCheckButtonSchema} context={context} />;
   }
 

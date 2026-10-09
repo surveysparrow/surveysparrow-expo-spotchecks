@@ -1,6 +1,6 @@
 {
   "name": "surveysparrow-expo-spotchecks",
-  "version": "2.0.4-beta.1",
+  "version": "2.0.4-beta.2",
   "description": "Spotchecks enables you to collect feedback from your mobile app. Embed the Classic, Chat & NPS surveys in your React Native application seamlessly with few lines of code.",
   "main": "build/index.js",
   "types": "build/index.d.ts",
@@ -53,6 +53,26 @@
     "react-native-safe-area-context": ">=4.0.0",
     "expo-secure-store": ">=13.0.0",
     "react-native-device-info": ">=8.7.0",
-    "axios": ">=0.21.0"
+    "axios": ">=0.21.0",
+    "expo-router": "*",
+    "@sentry/react-native": "*",
+    "expo-blur": "*"
+  },
+  "peerDependenciesMeta": {
+    "expo-router": {
+      "optional": true
+    },
+    "@sentry/react-native": {
+      "optional": true
+    },
+    "react-native-device-info": {
+      "optional": true
+    },
+    "expo-secure-store": {
+      "optional": true
+    },
+    "expo-blur": {
+      "optional": true
+    }
   }
 }

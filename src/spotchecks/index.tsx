@@ -1,19 +1,22 @@
-import React, { Component, ErrorInfo } from "react";
+import React, { Component, type ErrorInfo } from "react";
 import { Provider } from "react-redux";
 import WebViewComponent from "./components/WebViewComponent";
 import { Wrapper } from "./components/Wrapper";
-import { getAllSpotcheckFunctions, getUserAgent } from "./helpers";
-import {
+import { getAllSpotcheckFunctions, getUserAgent, getDeviceFacts } from "./helpers";
+import type {
   SpotcheckProps,
   TrackEventProps,
   TrackScreenOptions,
   TrackScreenProps,
 } from "./helpers/types";
-import { spotcheckStore, updateState } from "./state/spotcheckState";
-import { execute, flushPendingExecutes, setListener } from "./helpers/executables";
+import { spotcheckStore, updateState, buildInjectedJavaScript } from "./state/spotcheckState";
+import { execute, markInitialized, setListener } from "./helpers/executables";
 import { SpotCheckButton } from "./components/SpotCheckButton";
+// Registers CloseButton in the component registry.
+import "./components/CloseButton";
 import { useSpotcheckNavigation } from "./helpers/NavigationHandler";
-import { initializeSentry, captureP0Error } from "./helpers/sentry";
+import { initializeSentry, captureP0Error, addBreadcrumb } from "./helpers/sentry";
+import { FRAMEWORK } from "./helpers/version";
 
 function resolveTrackOptions(input?: TrackScreenOptions): Required<
   Pick<TrackScreenOptions, "variables" | "customProperties" | "userDetails">
@@ -25,7 +28,7 @@ function resolveTrackOptions(input?: TrackScreenOptions): Required<
   };
 }
 
-export const SDK_VERSION = '1.0.4-beta.1';
+export { SDK_VERSION } from './helpers/version';
 
 initializeSentry();
 
@@ -81,7 +84,36 @@ export const SpotCheck: React.FC = () => {
   );
 };
 
+// Backend-owned page script; the built-in one stays when missing.
+const applyWebViewScript = (script: unknown) => {
+  if (typeof script !== 'string' || !script.trim()) return;
+  const { webViewDetails } = spotcheckStore.getState().SpotCheckState;
+  spotcheckStore.dispatch(updateState({
+    webViewDetails: {
+      webViewConfig: {
+        ...webViewDetails.webViewConfig,
+        injectedJavaScript: buildInjectedJavaScript(script),
+      },
+    },
+  }));
+};
+
+// Init retry: a failed init (e.g. offline at launch) is retried on the next track call.
+const INIT_RETRY_GAP_MS = 10000;
+let lastInitParams: SpotcheckProps | null = null;
+let initStatus: "idle" | "running" | "done" | "failed" = "idle";
+let lastInitAttempt = 0;
+
+const retryInitIfFailed = () => {
+  if (initStatus !== "failed" || !lastInitParams) return;
+  if (Date.now() - lastInitAttempt < INIT_RETRY_GAP_MS) return;
+  initializeSpotChecks(lastInitParams).catch(() => {});
+};
+
 export const initializeSpotChecks = async (params: SpotcheckProps) => {
+  lastInitParams = params;
+  initStatus = "running";
+  lastInitAttempt = Date.now();
   // Setup: store params early so Sentry fallback has domainName
   try {
     if (params.listener) {
@@ -95,21 +127,27 @@ export const initializeSpotChecks = async (params: SpotcheckProps) => {
       spotcheckStore.dispatch(updateState({ params: { userAgent } }));
     }
   } catch (error: any) {
+    // Legacy never threw into the host app; failures go to Sentry and the console.
     captureP0Error(error, 'SDK_INITIALIZATION', {
       action: 'initializeSpotChecks:setup',
       errorMessage: error?.message,
     });
-    throw error;
+    console.error("Error initializing spotchecks:", error);
+    initStatus = "failed";
+    return;
   }
 
   // Init: fetch functions and initialize (has its own Sentry)
   try {
-    await getAllSpotcheckFunctions(params.domainName);
-    await execute("initializeSpotcheckComponent", params);
-    await flushPendingExecutes();
+    const device = await getDeviceFacts();
+    const initData = await getAllSpotcheckFunctions(params.domainName);
+    applyWebViewScript(initData?.config?.webViewScript);
+    await execute("initializeSpotcheckComponent", { ...params, framework: FRAMEWORK, device });
+    await markInitialized();
+    initStatus = "done";
   } catch (error: any) {
     console.error("Error initializing spotchecks:", error);
-    throw error;
+    initStatus = "failed";
   }
 };
 
@@ -129,11 +167,13 @@ export async function trackScreen(
       ? optionsArg
       : screenOrProps.options
   );
+  addBreadcrumb('trackScreen', { screen });
+  retryInitIfFailed();
   try {
-    execute("trackScreen", { screen, options });
+    await execute("trackScreen", { screen, options });
   } catch (error: any) {
+    // Legacy only logged; never throw into the host app.
     console.error("Error tracking screen:", error);
-    throw error;
   }
 }
 
@@ -154,26 +194,39 @@ export async function trackEvent(
   if (typeof screenOrProps === "string") {
     screen = screenOrProps;
     if (eventArg === undefined) {
-      throw new Error("trackEvent: `event` is required");
+      console.error("trackEvent: `event` is required");
+      return;
     }
     event = eventArg;
     options = resolveTrackOptions(optionsArg);
   } else {
+    if (!screenOrProps.screen) {
+      console.error("trackEvent: `screen` is required");
+      return;
+    }
     screen = screenOrProps.screen;
     if (screenOrProps.event == null) {
-      throw new Error("trackEvent: `event` is required");
+      console.error("trackEvent: `event` is required");
+      return;
     }
     event = screenOrProps.event;
     options = resolveTrackOptions(screenOrProps.options);
   }
+  addBreadcrumb('trackEvent', { screen, event: Object.keys(event || {}).join(',') });
+  retryInitIfFailed();
   try {
-    execute("trackEvent", { screen, event, options });
+    await execute("trackEvent", { screen, event, options });
   } catch (error: any) {
     console.error("Error tracking event:", error);
-    throw error;
   }
 }
 
+
+// Closes any open spotcheck and its button (screen changes the SDK can't detect).
+export async function closeSpotChecks(): Promise<void> {
+  addBreadcrumb("closeSpotChecks", {});
+  await execute("handleNavigationChange", { reason: "close" });
+}
 
 export type {
   CustomProperties,

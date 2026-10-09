@@ -2,7 +2,7 @@
 // All Sentry imports are optional — SDK works without @sentry/* packages.
 
 import { spotcheckStore } from '../state/spotcheckState';
-import { SDK_VERSION } from '../index';
+import { SDK_VERSION, FRAMEWORK } from './version';
 
 let ReactNativeClient: any = null;
 let Scope: any = null;
@@ -13,7 +13,6 @@ let defaultStackParser: any = null;
 let makeFetchTransport: any = null;
 let httpContextIntegration: any = null;
 let breadcrumbsIntegration: any = null;
-let deviceContextIntegration: any = null;
 let reactNativeInfoIntegration: any = null;
 let nativeReleaseIntegration: any = null;
 let eventOriginIntegration: any = null;
@@ -25,7 +24,6 @@ let isSentryAvailable = false;
 try {
   const sentryReactNative = require('@sentry/react-native');
   ReactNativeClient = sentryReactNative.ReactNativeClient;
-  deviceContextIntegration = sentryReactNative.deviceContextIntegration;
   reactNativeInfoIntegration = sentryReactNative.reactNativeInfoIntegration;
   nativeReleaseIntegration = sentryReactNative.nativeReleaseIntegration;
   eventOriginIntegration = sentryReactNative.eventOriginIntegration;
@@ -44,10 +42,91 @@ try {
   httpContextIntegration = sentryReact.httpContextIntegration;
   breadcrumbsIntegration = sentryReact.breadcrumbsIntegration;
 
-  isSentryAvailable = true;
+  // Tested on @sentry/react-native 6+; older majors use the basic report.
+  const major = parseInt(String(sentryReactNative.SDK_VERSION || '0'), 10);
+  const required = [
+    ReactNativeClient, dedupeIntegration, functionToStringIntegration, inboundFiltersIntegration,
+    defaultStackParser, makeFetchTransport, httpContextIntegration, breadcrumbsIntegration,
+    reactNativeInfoIntegration, nativeReleaseIntegration, eventOriginIntegration,
+    sdkInfoIntegration, expoContextIntegration,
+  ];
+  isSentryAvailable = major >= 6
+    && typeof Scope === 'function'
+    && typeof Scope.prototype?.setClient === 'function'
+    && required.every((fn) => typeof fn === 'function');
 } catch (e) {
   isSentryAvailable = false;
 }
+
+
+const MAX_BREADCRUMBS = 30;
+const sdkBreadcrumbs: any[] = [];
+
+export const addBreadcrumb = (message: string, data?: Record<string, any>) => {
+  sdkBreadcrumbs.push({ category: 'spotcheck', message, data, timestamp: Date.now() / 1000 });
+  if (sdkBreadcrumbs.length > MAX_BREADCRUMBS) sdkBreadcrumbs.shift();
+};
+
+const mergeBreadcrumbs = (sentryBreadcrumbs?: any[]) =>
+  [...(sentryBreadcrumbs || []), ...sdkBreadcrumbs]
+    .sort((a, b) => (a?.timestamp || 0) - (b?.timestamp || 0))
+    .slice(-50);
+
+// Routes an event to the backend; never throws.
+const sendToBackend = async (normalizedEvent: any) => {
+  try {
+    const { execute } = require('./executables');
+    const result = await execute('sentry.processSentryError', {
+      event: normalizedEvent,
+      sdkType: FRAMEWORK,
+      sdkVersion: SDK_VERSION,
+    });
+    if (result) return;
+
+    const { domainName, targetToken } = spotcheckStore.getState().SpotCheckState?.params || {};
+    if (!domainName) return;
+    await fetch(`https://${domainName}/api/internal/spotcheck/sdkErrors`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        errorMessage: normalizedEvent.errorMessage,
+        sdkType: FRAMEWORK,
+        sdkVersion: SDK_VERSION,
+        level: normalizedEvent.tags?.error_priority === 'P0' ? 'fatal' : 'error',
+        tags: normalizedEvent.tags,
+        extra: normalizedEvent.extra,
+        breadcrumbs: normalizedEvent.breadcrumbs,
+        contexts: { user: { spotcheck_token: targetToken || '', spotcheck_domain_name: domainName } },
+      }),
+    }).catch(() => {});
+  } catch {
+    // Reporting must never break the host app.
+  }
+};
+
+// Used when @sentry/* is not installed in the host app.
+const reportWithoutSentry = (
+  error: Error | unknown,
+  priority: 'P0' | 'P1',
+  source: string,
+  extra?: Record<string, any>
+) => {
+  const err = error as any;
+  sendToBackend({
+    errorMessage: err?.message || String(error),
+    tags: {
+      error_priority: priority,
+      severity: priority === 'P0' ? 'CRITICAL' : 'HIGH',
+      errorType: source,
+    },
+    contexts: {},
+    extra: extra || {},
+    breadcrumbs: mergeBreadcrumbs(),
+    exceptions: [{ type: err?.name || 'Error', value: err?.message || String(error), stack: String(err?.stack || '').slice(0, 2000) }],
+    timestamp: Date.now() / 1000,
+    platform: 'javascript',
+  });
+};
 
 let sdkScope: any = null;
 let sdkClient: any = null;
@@ -64,7 +143,8 @@ export const initializeSentry = () => {
       dsn: 'https://dummy@sentry.io/0',
       transport: makeFetchTransport,
       stackParser: defaultStackParser,
-      enableNative: true,
+      // Never touch the host app's native Sentry SDK.
+      enableNative: false,
       enableAutoSessionTracking: false,
       integrations: [
         inboundFiltersIntegration(),
@@ -72,7 +152,6 @@ export const initializeSentry = () => {
         breadcrumbsIntegration(),
         dedupeIntegration(),
         httpContextIntegration(),
-        deviceContextIntegration(),
         nativeReleaseIntegration(),
         eventOriginIntegration(),
         sdkInfoIntegration(),
@@ -80,15 +159,15 @@ export const initializeSentry = () => {
         expoContextIntegration(),
       ],
       beforeSend: async (event: any) => {
-        // Normalize raw Sentry event into platform-agnostic structure
-        const normalizedEvent = {
+        await sendToBackend({
           errorMessage:
             event.message ||
             event.exception?.values?.[0]?.value ||
             'Unknown error',
           tags: event.tags || {},
           contexts: event.contexts || {},
-          breadcrumbs: event.breadcrumbs,
+          extra: event.extra || {},
+          breadcrumbs: mergeBreadcrumbs(event.breadcrumbs),
           exceptions: event.exception?.values?.map((e: any) => ({
             type: e.type,
             value: e.value,
@@ -100,43 +179,14 @@ export const initializeSentry = () => {
           release: event.release,
           environment: event.environment,
           sdk: event.sdk,
-        };
-
-        // Lazy require to break circular dependency (sentry <-> executables)
-        const { execute } = require('./executables');
-        const result = await execute('sentry.processSentryError', {
-          event: normalizedEvent,
-          sdkType: 'react-native',
-          sdkVersion: SDK_VERSION,
         });
-
-        // Fallback: if backend functions not loaded yet, send directly
-        if (!result) {
-          const domainName = spotcheckStore.getState().SpotCheckState?.params?.domainName;
-          if (domainName) {
-            fetch(`https://${domainName}/api/internal/spotcheck/sdkErrors`, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                errorMessage: normalizedEvent.errorMessage,
-                sdkType: 'react-native',
-                sdkVersion: SDK_VERSION,
-                tags: {
-                  ...normalizedEvent.tags,
-                  error_priority: 'P0',
-                  severity: 'CRITICAL',
-                  errorType: 'ATOMIC_FUNCTION_ERROR',
-                },
-              }),
-            }).catch(() => {});
-          }
-        }
-
         return null;
       },
     });
 
-    client.init();
+    // Base Client init only; ReactNativeClient.init() would call NATIVE.initNativeSdk.
+    const baseInit = Object.getPrototypeOf(ReactNativeClient.prototype)?.init;
+    if (typeof baseInit === 'function') baseInit.call(client);
 
     const scope = new Scope();
     scope.setClient(client);
@@ -163,7 +213,10 @@ export const captureP0Error = (
   source: ErrorSource,
   extra?: Record<string, any>
 ) => {
-  if (!isSentryAvailable) return;
+  if (!isSentryAvailable) {
+    reportWithoutSentry(error, 'P0', source, extra);
+    return;
+  }
 
   if (!sdkScope || !sdkClient) {
     initializeSentry();
@@ -190,7 +243,10 @@ export const captureP1Error = (
   source: ErrorSource,
   extra?: Record<string, any>
 ) => {
-  if (!isSentryAvailable) return;
+  if (!isSentryAvailable) {
+    reportWithoutSentry(error, 'P1', source, extra);
+    return;
+  }
 
   if (!sdkScope || !sdkClient) {
     initializeSentry();

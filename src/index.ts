@@ -3,9 +3,10 @@ import {
   initializeSpotChecks,
   trackScreen,
   trackEvent,
+  closeSpotChecks,
 } from "./spotchecks";
 
-export { initializeSpotChecks, trackScreen, trackEvent };
+export { initializeSpotChecks, trackScreen, trackEvent, closeSpotChecks };
 export default SpotCheck;
 
 export type {

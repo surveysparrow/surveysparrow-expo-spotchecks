@@ -38,9 +38,10 @@ export interface TrackScreenOptions {
   userDetails?: UserDetails;
 }
 
+// Also accepts the legacy shape: the event map itself (e.g. { MobileClick: {} }).
 export interface TrackEventProps {
-  screen: string;
-  event: Record<string, any>;
+  screen?: string;
+  event?: Record<string, any>;
   options?: TrackScreenOptions;
   [key: string]: any;
 }

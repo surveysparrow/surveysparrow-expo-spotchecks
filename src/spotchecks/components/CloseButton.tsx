@@ -1,6 +1,6 @@
 import { useEffect, useState, useMemo } from "react";
 import { useSelector } from "react-redux";
-import { SpotcheckState } from "../state/spotcheckState";
+import type { SpotcheckState } from "../state/spotcheckState";
 import { componentStore } from "../state/componentState";
 import { Builder } from "./Builder";
 import { componentRegistry } from "./ComponentRegistry";
@@ -34,7 +34,7 @@ export const CloseButton: React.FC = () => {
       }
     };
     loadStyles();
-  }, [state.spotCheckDetails.closeButton]);
+  }, [state.spotCheckDetails.closeButton, state.spotCheckDetails.isRTLLanguage]);
 
   const closeButtonSchema = componentState?.schemas?.closeButton;
 

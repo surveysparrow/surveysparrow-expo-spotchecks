@@ -1,9 +1,9 @@
 import React, { useCallback, useEffect, useState, useMemo } from "react";
 import { Keyboard, Platform } from "react-native";
-import WebView, { WebViewMessageEvent } from "react-native-webview";
-import { WebViewErrorEvent } from "react-native-webview/lib/WebViewTypes";
+import WebView, { type WebViewMessageEvent } from "react-native-webview";
+import type { WebViewErrorEvent } from "react-native-webview/lib/WebViewTypes";
 import { useSelector } from "react-redux";
-import { SpotcheckState } from "../state/spotcheckState";
+import type { SpotcheckState } from "../state/spotcheckState";
 import { componentStore } from "../state/componentState";
 import { Builder } from "./Builder";
 import { WebViewRenderer } from "./WebViewRenderer";

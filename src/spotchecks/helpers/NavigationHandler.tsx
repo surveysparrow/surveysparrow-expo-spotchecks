@@ -4,26 +4,27 @@ import { captureP1Error } from '../helpers/sentry';
 
 function useSafeNavigation() {
   try {
-    const { useSegments } = require('expo-router');
+    const { usePathname } = require('expo-router');
+    // Real path (/product/1 vs /product/2), not the route pattern from useSegments.
     // eslint-disable-next-line react-hooks/rules-of-hooks
-    return useSegments();
+    return usePathname() as string;
   } catch (error) {
     return null;
   }
 }
 
 export function useSpotcheckNavigation() {
-  const segments = useSafeNavigation();
+  const pathname = useSafeNavigation();
   const previousRoute = useRef<string | null>(null);
   const hasInitialized = useRef(false);
 
   useLayoutEffect(() => {
-    if (!segments) {
+    if (!pathname) {
       return;
     }
     
     try {
-      const currentRoute = segments.join('/');
+      const currentRoute = pathname;
 
       if (!hasInitialized.current) {
         previousRoute.current = currentRoute;
@@ -46,5 +47,5 @@ export function useSpotcheckNavigation() {
       });
       console.error('Spotcheck: Navigation listener failed', error);
     }
-  }, [segments]);
+  }, [pathname]);
 }

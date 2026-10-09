@@ -1,7 +1,7 @@
 import { Dimensions } from "react-native";
 
 import { useSelector } from "react-redux";
-import { SpotcheckState } from "../state/spotcheckState";
+import type { SpotcheckState } from "../state/spotcheckState";
 import { componentStore } from "../state/componentState";
 import { Builder } from "./Builder";
 import { execute } from "../helpers/executables";
@@ -43,7 +43,14 @@ export const Wrapper: React.FC<{ children: React.ReactNode }> = ({
 
   useEffect(() => {
     execute("wrapper.getWrapperStyles", { screenHeight, screenWidth, setStyles });
-  }, [screenHeight, screenWidth, state.showSpotCheck, state.spotCheckDetails.isMounted, state.spotCheckDetails.currentQuestionHeight, state.spotCheckDetails.isExiting, state.spotCheckDetails.keyBoardHeight, state.spotCheckDetails.textPosition]);
+  }, [screenHeight, screenWidth, state.showSpotCheck, state.spotCheckDetails, state.currentSpotcheck]);
+
+  // Keeps the injected focus script's screen height correct after rotation.
+  useEffect(() => {
+    const script = `window.__ssScreenHeight = ${screenHeight}; true;`;
+    state.webViewDetails.classicWebViewRef?.injectJavaScript?.(script);
+    state.webViewDetails.chatWebViewRef?.injectJavaScript?.(script);
+  }, [screenHeight, state.webViewDetails.classicWebViewRef, state.webViewDetails.chatWebViewRef]);
 
   const wrapperSchema = componentState?.schemas?.wrapper;
 
@@ -57,10 +64,6 @@ export const Wrapper: React.FC<{ children: React.ReactNode }> = ({
 
   if (wrapperSchema && componentState.isLoaded) {
     return <Builder schema={wrapperSchema} context={context} />;
-  }
-
-  if (!wrapperSchema || !componentState.isLoaded) {
-    return null;
   }
 
   return null;

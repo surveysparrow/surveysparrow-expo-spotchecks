@@ -1,7 +1,7 @@
 import React from "react";
 import { View } from "react-native";
-import WebView, { WebViewMessageEvent } from "react-native-webview";
-import { WebViewErrorEvent } from "react-native-webview/lib/WebViewTypes";
+import WebView, { type WebViewMessageEvent } from "react-native-webview";
+import type { WebViewErrorEvent } from "react-native-webview/lib/WebViewTypes";
 
 export const WebViewRenderer = React.forwardRef<
   WebView,
@@ -23,8 +23,11 @@ export const WebViewRenderer = React.forwardRef<
             height: "100%",
           }
           : {
-            width: 0,
-            height: 0,
+            // Legacy kept hidden webviews 1x1 off-screen so they keep loading.
+            position: "absolute",
+            left: -1000,
+            width: 1,
+            height: 1,
             opacity: 0,
           }
       }

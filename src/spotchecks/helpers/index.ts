@@ -1,5 +1,5 @@
 import { Dimensions, Platform } from "react-native";
-import { VisitorInfo } from "./types";
+import type { VisitorInfo } from "./types";
 import axios from 'axios';
 import { functionStore, updateState as updateFunctionState } from '../state/functionState';
 import { componentStore, updateState as updateComponentState } from '../state/componentState';
@@ -10,7 +10,7 @@ export const getVisitorInfo = (): VisitorInfo => {
 
   return {
     deviceType: "MOBILE",
-    operatingSystem: Platform.OS === "ios" ? "iOS" : "Android",
+    operatingSystem: Platform.OS, // legacy: "ios" / "android"
     screenResolution: {
       width: Math.round(width),
       height: Math.round(height),
@@ -18,6 +18,24 @@ export const getVisitorInfo = (): VisitorInfo => {
     currentDate: new Date(),
     timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
   };
+};
+
+// Raw device facts; the backend builds the User-Agent from these.
+export const getDeviceFacts = async () => {
+  const facts: Record<string, unknown> = {
+    os: Platform.OS,
+    osVersion: String(Platform.Version),
+    isTablet: false,
+  };
+  try {
+    const DeviceInfo = require('react-native-device-info').default;
+    facts.isTablet = DeviceInfo.isTablet();
+    if (Platform.OS === 'ios') {
+      facts.deviceName = await DeviceInfo.getDeviceName();
+      facts.model = DeviceInfo.getModel();
+    }
+  } catch {}
+  return facts;
 };
 
 export const getUserAgent = async (): Promise<string> => {
@@ -51,7 +69,7 @@ export const getAllSpotcheckFunctions = async (domainName: string) => {
   try {
     const response = await axios.get(`https://${domainName}/api/internal/spotcheck/mobile/init?framework=expo`);
     
-    const { componentSchemas, ...functions } = response.data;
+    const { componentSchemas, config, ...functions } = response.data;
     
     functionStore.dispatch(updateFunctionState({ ...functions, isLoaded: true }));
     

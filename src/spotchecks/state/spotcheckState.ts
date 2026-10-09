@@ -2,6 +2,44 @@ import { combineReducers, configureStore, createSlice, type PayloadAction } from
 import { Dimensions } from 'react-native';
 import { getVisitorInfo } from '../helpers';
 
+// Native bridge shim; stays in the SDK (tied to ReactNativeWebView).
+const NATIVE_BRIDGE_JS = `
+  window.__ssScreenHeight = window.__ssScreenHeight || ${Dimensions.get('window').height};
+  window.flutterSpotCheckData = {
+    postMessage: function(data) {
+      window.ReactNativeWebView.postMessage(data);
+    }
+  };
+`;
+
+// Built-in page script; the backend can replace it via init config.webViewScript.
+const DEFAULT_PAGE_JS = `
+  document.addEventListener('focusin', function(event) {
+    if (event.target.tagName === 'INPUT' || event.target.tagName === 'TEXTAREA') {
+      var rect = event.target.getBoundingClientRect();
+      var yPosition = rect.y + window.scrollY;
+      var scaledY = (yPosition / window.innerHeight) * (window.__ssScreenHeight || window.innerHeight);
+      window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'position', y: scaledY }));
+    }
+  });
+
+  (function() {
+    var obs = new MutationObserver(function() {
+      var input = document.querySelector(".ss-language-selector__select__input input");
+      if (input) input.setAttribute("readonly", true);
+    });
+    obs.observe(document.body, { childList: true, subtree: true });
+  })();
+
+  (function() {
+    var s = document.createElement("style");
+    s.innerHTML = ".close-btn-chat--spotchecks { display: none !important; }";
+    (document.head || document.documentElement).appendChild(s);
+  })();
+`;
+
+export const buildInjectedJavaScript = (pageJs: string) => `${NATIVE_BRIDGE_JS}\n${pageJs}`;
+
 const initialState: any = {
   allSpotChecksInToken: [],
   customEventsSpotChecks: [],
@@ -54,6 +92,7 @@ const initialState: any = {
     showSurveyContent: true,
     avatarEnabled: false,
     avatarUrl: '',
+    isRTLLanguage: false,
   },
 
   webViewDetails: {
@@ -69,54 +108,8 @@ const initialState: any = {
     webViewInjectionData: null,
     scrollEnabled: true,
     webViewConfig: {
-      injectedJavaScript: `
-        document.addEventListener('focusin', function(event) {
-          if (event.target.tagName === 'INPUT' || event.target.tagName === 'TEXTAREA') {
-            var rect = event.target.getBoundingClientRect();
-            var yPosition = rect.y + window.scrollY;
-            var webViewHeight = window.innerHeight;
-            var scaledY = (yPosition / webViewHeight) * ${Dimensions.get('window').height};
-            window.ReactNativeWebView.postMessage(JSON.stringify({
-              type: 'position',
-              y: scaledY
-            }));
-          }
-        });
-
-        window.flutterSpotCheckData = {
-          postMessage: function(data) {
-            window.ReactNativeWebView.postMessage(data);
-          }
-        };
-
-        (function() {
-          const observer = new MutationObserver((mutations, obs) => {
-            const input = document.querySelector(".ss-language-selector__select__input input");
-            if (input) {
-              input.setAttribute("readonly", true);
-            }
-          });
-      
-          observer.observe(document.body, {
-            childList: true,
-            subtree: true
-          });
-        })();
-
-        (function() {
-          const styleTag = document.createElement("style");
-          styleTag.innerHTML = \`
-            .surveysparrow-chat__wrapper .ss-language-selector--wrapper {
-              margin-right: 45px;
-            }
-            .close-btn-chat--spotchecks {
-              display: none !important;
-            }
-          \`;
-          document.head.appendChild(styleTag);
-        })();
-      `,
-      webviewDebuggingEnabled: true,
+      injectedJavaScript: buildInjectedJavaScript(DEFAULT_PAGE_JS),
+      webviewDebuggingEnabled: __DEV__,
       geolocationEnabled: true,
       mediaPlaybackRequiresUserAction: false,
       originWhitelist: ["*"],

@@ -67,9 +67,15 @@ export const getUserAgent = async (): Promise<string> => {
 
 export const getAllSpotcheckFunctions = async (domainName: string) => {
   try {
-    const response = await axios.get(`https://${domainName}/api/internal/spotcheck/mobile/init?framework=expo`);
-    
-    const { componentSchemas, config, ...functions } = response.data;
+    // Bounded so a stalled request fails and the next track call can retry init.
+    const response = await axios.get(`https://${domainName}/api/internal/spotcheck/mobile/init?framework=expo`, { timeout: 15000 });
+    const data = response?.data;
+    // A non-JSON 200 (e.g. captive portal) counts as a failed init.
+    if (!data || typeof data !== 'object' || typeof data.initializeSpotcheckComponent !== 'string') {
+      throw new Error('Invalid mobile/init response');
+    }
+
+    const { componentSchemas, config, ...functions } = data;
     
     functionStore.dispatch(updateFunctionState({ ...functions, isLoaded: true }));
     
@@ -80,7 +86,7 @@ export const getAllSpotcheckFunctions = async (domainName: string) => {
       }));
     }
     
-    return response.data;
+    return data;
   } catch (error: any) {
     captureP0Error(error, 'SPOTCHECK_INITIALIZATION', {
       component: 'getAllSpotcheckFunctions',

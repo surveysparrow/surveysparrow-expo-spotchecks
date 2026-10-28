@@ -4,6 +4,7 @@ import axios from 'axios';
 import { functionStore, updateState as updateFunctionState } from '../state/functionState';
 import { componentStore, updateState as updateComponentState } from '../state/componentState';
 import { captureP0Error, captureP1Error } from './sentry';
+import { getDeviceInfo } from './optional/deviceInfo';
 
 export const getVisitorInfo = (): VisitorInfo => {
   const { width, height } = Dimensions.get("window");
@@ -28,12 +29,19 @@ export const getDeviceFacts = async () => {
     isTablet: false,
   };
   try {
-    const DeviceInfo = require('react-native-device-info').default;
+    const DeviceInfo = getDeviceInfo();
+    if (!DeviceInfo) {
+      // Android has the model built in; iOS needs react-native-device-info.
+      const builtInModel = Platform.OS === 'android' ? Platform.constants?.Model : '';
+      if (builtInModel) facts.model = String(builtInModel);
+      return facts;
+    }
     facts.isTablet = DeviceInfo.isTablet();
     if (Platform.OS === 'ios') {
       facts.deviceName = await DeviceInfo.getDeviceName();
-      facts.model = DeviceInfo.getModel();
     }
+    const model = DeviceInfo.getModel();
+    if (model) facts.model = String(model);
     // Host app release; the backend keeps the SDK version of the newest build.
     const appVersion = DeviceInfo.getVersion?.();
     const appBuild = DeviceInfo.getBuildNumber?.();
@@ -43,10 +51,20 @@ export const getDeviceFacts = async () => {
   return facts;
 };
 
+// Used when react-native-device-info is not installed or fails.
+const fallbackUserAgent = () => {
+  const version = String(Platform.Version);
+  if (Platform.OS === 'android') {
+    return `(Linux; Android ${version}; Mobile) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/110.0.0.0 Mobile Safari/537.36`;
+  }
+  return `(iPhone; CPU iPhone OS ${version.replace(/\./g, '_')} like Mac OS X) AppleWebKit/537.36 (KHTML, like Gecko) Version/16.0 Mobile/15E148 Safari/537.36`;
+};
+
 export const getUserAgent = async (): Promise<string> => {
   let userAgent = 'Mozilla/5.0 ';
   try {
-    const DeviceInfo = require('react-native-device-info').default;
+    const DeviceInfo = getDeviceInfo();
+    if (!DeviceInfo) return userAgent + fallbackUserAgent();
     const isTabletDevice = DeviceInfo.isTablet();
 
     if (Platform.OS === 'android') {
@@ -59,13 +77,7 @@ export const getUserAgent = async (): Promise<string> => {
       action: 'getUserAgent',
       errorMessage: error?.message,
     });
-    // Fallback if react-native-device-info is not installed
-    const version = String(Platform.Version);
-    if (Platform.OS === 'android') {
-      userAgent += `(Linux; Android ${version}; Mobile) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/110.0.0.0 Mobile Safari/537.36`;
-    } else {
-      userAgent += `(iPhone; CPU iPhone OS ${version.replace(/\./g, '_')} like Mac OS X) AppleWebKit/537.36 (KHTML, like Gecko) Version/16.0 Mobile/15E148 Safari/537.36`;
-    }
+    userAgent += fallbackUserAgent();
   }
   return userAgent;
 };

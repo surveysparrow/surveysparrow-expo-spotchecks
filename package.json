@@ -4,6 +4,14 @@
   "description": "Spotchecks enables you to collect feedback from your mobile app. Embed the Classic, Chat & NPS surveys in your React Native application seamlessly with few lines of code.",
   "main": "build/index.js",
   "types": "build/index.d.ts",
+  "files": [
+    "build",
+    "src",
+    "android",
+    "expo-module.config.json",
+    "!android/build",
+    "!**/__tests__"
+  ],
   "scripts": {
     "build": "expo-module build",
     "clean": "expo-module clean",

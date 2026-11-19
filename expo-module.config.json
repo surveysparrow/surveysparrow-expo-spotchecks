@@ -1,0 +1,11 @@
+{
+  "platforms": [
+    "android"
+  ],
+  "android": {
+    "modules": [
+      "com.surveysparrow.expo_spotchecks.AdjusterModule",
+      "com.surveysparrow.expo_spotchecks.StorageModule"
+    ]
+  }
+}
